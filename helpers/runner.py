@@ -3,7 +3,10 @@ A helper function to run a tournament with your agent.
 
 You only need to change the name of the class implementing your agent at the top of this file.
 """
-
+from tmp import ImprovedNegotiator
+from TMP2 import cc
+from tmp3 import AwesomeNegotiator
+from tmp4 import BayesianNegotiator
 
 def run_a_tournament(
     TestedNegotiator,
@@ -42,7 +45,7 @@ def run_a_tournament(
         DEFAULT_TOURNAMENT_PATH,
         anl2024_tournament,
     )
-    from anl.anl2024.negotiators import Conceder
+    from anl.anl2024.negotiators import Conceder, Boulware
     from negmas.helpers import humanize_time, unique_name
     from rich import print
 
@@ -54,7 +57,7 @@ def run_a_tournament(
     )
     if small:
         anl2024_tournament(
-            competitors=tuple([TestedNegotiator, Conceder]),
+            competitors=tuple([TestedNegotiator, Boulware]),
             n_scenarios=1,
             n_outcomes=n_outcomes,
             n_repetitions=1,

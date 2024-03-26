@@ -10,6 +10,8 @@ import random
 import math
 from typing import Tuple
 from scipy.optimize import curve_fit
+import numpy as np
+from scipy.stats import beta
 
 from negmas.outcomes import Outcome
 from negmas.sao import ResponseType, SAONegotiator, SAOResponse, SAOState
@@ -31,15 +33,18 @@ class ConcessionCurve:
         return self.reserved_value + (self.max_utility - self.reserved_value) * (1.0 - math.pow(time, self.exponent))
 
 
-class ImprovedNegotiator(SAONegotiator):
+class cc(SAONegotiator):
     """
-    An improved negotiator agent that can learn the opponent's concession strategy.
+    An improved negotiator agent that can learn the opponent's concession strategy using Bayesian learning.
     """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.concession_curve: ConcessionCurve = None
         self.offer_history: list[Tuple[float, Outcome]] = []
+        self.max_utility_prior = beta(5, 2)
+        self.reserved_value_prior = beta(5, 2)
+        self.exponent_prior = beta(2, 5)
 
     def on_preferences_changed(self, changes):
         """
@@ -116,7 +121,7 @@ class ImprovedNegotiator(SAONegotiator):
 
     def update_concession_curve(self, state: SAOState) -> None:
         """
-        Update the estimated concession curve of the opponent.
+        Update the estimated concession curve of the opponent using Bayesian learning.
         """
         if self.ufun is None or self.opponent_ufun is None or not self.offer_history:
             return
@@ -125,18 +130,32 @@ class ImprovedNegotiator(SAONegotiator):
         opponent_utilities = [self.opponent_ufun(offer) for _, offer in self.offer_history]
         relative_times = [time for time, _ in self.offer_history]
 
-        # Fit the concession curve parameters using curve_fit
-        try:
-            params, _ = curve_fit(
-                lambda t, max_util, rv, exp: rv + (max_util - rv) * (1.0 - math.pow(t, exp)),
-                relative_times, opponent_utilities,
-                bounds=((0.0, 0.0, 0.2), (1.0, 1.0, 5.0))
-            )
-            self.concession_curve = ConcessionCurve(*params)
-        except:
-            pass
+        # Update the prior distributions based on the new data
+        self.max_utility_prior = self.update_beta_prior(self.max_utility_prior, opponent_utilities)
+        self.reserved_value_prior = self.update_beta_prior(self.reserved_value_prior, opponent_utilities)
+        self.exponent_prior = self.update_beta_prior(self.exponent_prior, relative_times)
+
+        # Sample from the posterior distributions to get the concession curve parameters
+        max_utility = self.max_utility_prior.rvs()
+        reserved_value = self.reserved_value_prior.rvs()
+        exponent = self.exponent_prior.rvs()
+
+        self.concession_curve = ConcessionCurve(max_utility, reserved_value, exponent)
+
+    def update_beta_prior(self, prior: beta, data: list[float]) -> beta:
+        """
+        Update a beta prior distribution based on new data.
+        """
+        a, b = prior.args
+        n = len(data)
+        new_a = a + sum(data)
+        new_b = b + n - sum(data)
+        return beta(new_a, new_b)
 # Run a small tournament for testing
 if __name__ == "__main__":
     from helpers.runner import run_a_tournament
 
     run_a_tournament(ImprovedNegotiator, small=True)
+
+
+# , cc, AwesomeNegotiator, BayesianNegotiator, ImprovedNegotiator
