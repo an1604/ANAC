@@ -33,7 +33,7 @@ class ConcessionCurve:
         return self.reserved_value + (self.max_utility - self.reserved_value) * (1.0 - math.pow(time, self.exponent))
 
 
-class cc(SAONegotiator):
+class ConcessionBayesianNegotiator(SAONegotiator):
     """
     An improved negotiator agent that can learn the opponent's concession strategy using Bayesian learning.
     """

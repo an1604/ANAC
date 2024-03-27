@@ -3,10 +3,10 @@ A helper function to run a tournament with your agent.
 
 You only need to change the name of the class implementing your agent at the top of this file.
 """
-from tmp import ImprovedNegotiator
-from TMP2 import cc
-from tmp3 import AwesomeNegotiator
-from tmp4 import BayesianNegotiator
+from ImprovedNegotiator import ImprovedNegotiator
+from ConcessionBayesianNegotiator import ConcessionBayesianNegotiator
+from AwesomeNegotiator import AwesomeNegotiator
+from BayesianNegotiator import BayesianNegotiator
 
 def run_a_tournament(
     TestedNegotiator,
