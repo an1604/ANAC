@@ -1,12 +1,3 @@
-"""
-**Submitted to ANAC 2024 Automated Negotiation League**
-*Team* type your team name here
-*Authors* type your team member names with their emails here
-
-This code is free to use or update given that proper attribution is given to
-the authors and the ANAC 2024 ANL competition.
-"""
-
 import random
 from negmas.gb.common import GBState
 from negmas.outcomes import Outcome
@@ -15,20 +6,20 @@ from negmas.sao import ResponseType, SAONegotiator, SAOResponse, SAOState
 
 class AwesomeNegotiator(SAONegotiator):
     IP = 0  # Initial price will be set during negotiation start
-    RP = random.uniform(0, 0.75)  # Reserve price
-    T = random.uniform(2, 10)  # Deadline
-    beta = random.uniform(5, 10)  # Concession parameter
+    RP = 0  # Reserve price
+    T = 0  # Deadline
+    beta = 0  # Concession parameter
 
     rational_outcomes = tuple()
 
     partner_reserved_value = 0
 
     def on_negotiation_start(self, state: GBState) -> None:
-        self.IP = 1
+        # initialize the parameters
+        self.IP = 0.7
         self.RP = self.reserved_value
         self.T = self.nmi.n_steps
-        self.beta = 1.4
-        self.ufun.r
+        self.beta = 100
 
     def on_preferences_changed(self, changes):
         # If there a no outcomes (should in theory never happen)
@@ -63,8 +54,12 @@ class AwesomeNegotiator(SAONegotiator):
 
         offer = state.current_offer
 
+        if self.isFinalRound(state):
+            # print(f"final round, accepting offer: {offer} with utility: {self.ufun(offer)}")
+            return True
+
         if self.ufun(offer) >= self.ufun(self.bidding_strategy(state)):
-            print(f"Accepting offer: {offer} with utility: {self.ufun(offer)}")
+            # print(f"Accepting offer: {offer} with utility: {self.ufun(offer)}")
             return True
 
         return False
@@ -73,13 +68,13 @@ class AwesomeNegotiator(SAONegotiator):
         assert self.ufun
 
         t = state.step
+
         target_offer = self.IP + (self.RP - self.IP) * (t / self.T) ** self.beta
         # print(f"Target offer: {target_offer}")
 
         if target_offer < self.reserved_value:
             target_offer = self.reserved_value
             # print(f"Target offer: {target_offer} is below the reserved value")
-
 
         closest_outcome = None
         min_distance = float("inf")
@@ -91,6 +86,7 @@ class AwesomeNegotiator(SAONegotiator):
                 min_distance = distance
                 closest_outcome = outcome
 
+        # print(f"Closest outcome: {closest_outcome} with utility: {self.ufun(closest_outcome)}")
         return closest_outcome
 
     def update_partner_reserved_value(self, state: SAOState) -> None:
@@ -107,20 +103,22 @@ class AwesomeNegotiator(SAONegotiator):
             if self.opponent_ufun(_) > self.partner_reserved_value
         ]
 
-    def _on_negotiation_end(self, state: GBState) -> None:
-        print(
-            f"Negotiation ended with agreement: {state.agreement} and utility: {self.ufun(state.agreement)}"
-        )
-        print(
-            f"------------------------------------------------------------------------------"
-        )
+    # def _on_negotiation_end(self, state: GBState) -> None:
+    #     print(
+    #         f"Final score: {self.ufun(state.agreement) - self.reserved_value * self.opponent_ufun(state.agreement)-0.2}"
+    #     )
 
-    def on_round_start(self, state: GBState) -> None:
-        print(f"Round {state.step}/{self.T}")
+    # def on_round_start(self, state: SAOState) -> None:
+        # print(f"offer: {state.current_offer} with utility: {self.ufun(state.current_offer)} and opponent utility: {self.opponent_ufun(state.current_offer)}")
+
+    def isFinalRound(self, state: SAOState) -> bool:
+        if state.step == self.T - 1:
+            return True
+        return False
 
 
 # if you want to do a very small test, use the parameter small=True here. Otherwise, you can use the default parameters.
 if __name__ == "__main__":
     from helpers.runner import run_a_tournament
 
-    run_a_tournament(AwesomeNegotiator,small=True)
+    run_a_tournament(AwesomeNegotiator, small=True)
