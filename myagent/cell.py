@@ -1,4 +1,5 @@
 import numpy as np
+from scipy import stats
 
 
 class Cell:
@@ -10,7 +11,7 @@ class Cell:
         self.offers_associated = offers_associated
         self.cell_key = cell_key
         self.prob = Probabilities(prior_probability, likelihood,
-                                  posterior_probability)
+                                  posterior_probability, Y=offers_associated)
 
     def offer_in_cell(self, offer):
         return True
@@ -33,10 +34,12 @@ class Cell:
 
 
 class Probabilities:
-    def __init__(self, prior, likelihood, posterior):
+    def __init__(self, prior, likelihood, posterior, Y):
         self.prior_probability = prior
         self.likelihood_probability = likelihood
         self.posterior_probability = posterior
+        self.can_sd = 0.05  # The standard deviation for sampling from normal distribution.
+        self.Y = self.init_probs(Y)  # Some samples
 
     def update_prior_probability(self, new_value):
         self.prior_probability = new_value
@@ -55,3 +58,9 @@ class Probabilities:
 
     def get_posterior_probability(self):
         return self.posterior_probability
+
+    def init_probs(self, Y):
+        pass
+
+    def test_for_standard_deviation(self, test_point):
+        return stats.norm(test_point, self.can_sd).pdf(1)

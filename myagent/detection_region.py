@@ -259,20 +259,22 @@ class DetectionRegion:
                 # We update the posterior probabilities according to Bayes updating rule.
                 cell.prob.update_posterior_probability((correlation_coefficient_value *
                                                         cell.prob.prior_probability))
-                # Update the prior probability according to the posterior probability for the next rounds
-                cell.prob.update_prior_probability(cell.prob.get_posterior_probability())
                 self.switch(cell)  # Switch the previous cell information with the updated information.
 
         # For keeping the maximum probabilities.
         max_probabilities = self.find_maximum_probability()
         self.best_probabilities.append(max_probabilities)
 
+        for cell in self._cells:
+            # Update the prior probability according to the posterior probability for the next rounds
+            cell.prob.update_prior_probability(cell.prob.get_posterior_probability())
+
         print(f"Probabilities after update at time {current_time}:")
         for cell in self._cells:
-            print(f"\tcell: {cell.cell_index},"
-                  f"\n\tcell range: {cell.cell_range},"
-                  f"\n\tcell center: {cell.cluster_center},"
-                  f"\n\tprobability: {cell.prob.__dict__} ")
+            print(
+                f"\n\tfor cell {cell.cell_index}, with range: {cell.cell_range},"
+                f"\nThe probabilities are: {cell.prob.__dict__} "
+            )
 
     def switch(self, cell):
         for _cell in self._cells:

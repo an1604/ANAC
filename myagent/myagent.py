@@ -177,6 +177,7 @@ class MyAgent(SAONegotiator):
                 return SAOResponse(ResponseType.ACCEPT_OFFER, offer)
 
             bid = self.generate_offer(offer=offer, _time=state.time, relative_time=state.relative_time)
+            print(f"The counter-offer bid is {bid}")
             return SAOResponse(ResponseType.REJECT_OFFER, bid)
 
         return SAOResponse(ResponseType.REJECT_OFFER, self.ufun.best())
