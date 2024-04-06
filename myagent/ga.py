@@ -3,6 +3,7 @@ import random
 from numpy import sort
 
 
+
 class SINGLE_POP:
     def __init__(self, fitness_val, points_path):
         self.fitness_val = fitness_val
@@ -15,8 +16,8 @@ class SINGLE_POP:
 
 
 def dist(p1, p2):
-    return abs(p1 - p2) if isinstance(p1, float) and isinstance(p2, float) \
-        else abs(float(p1[-1]) - float(p2[-1]))
+    return float(math.sqrt((p1.outcome - p2.outcome) ** 2 + (p1.ranking_rate - p2.ranking_rate) ** 2) +
+                 (p1.lucia_rate - p2.lucia_rate) ** 2)
 
 
 def fitness(points):

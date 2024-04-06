@@ -6,7 +6,7 @@ import numpy as np
 def get_random_rv(time_lower_bound, time_upper_bound, price_lower_bound, price_upper_bound):
     rand_time = random.uniform(time_lower_bound, time_upper_bound)
     rand_price = random.uniform(price_lower_bound, price_upper_bound)
-    return rand_time, rand_price
+    return np.array([rand_time, rand_price])
 
 
 def custom_max(item):
@@ -36,3 +36,15 @@ def nash_optimality(utility1, rv1, utility2, rv2):
 
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
+
+
+def calc_average_fitted_offers(fitted_offers):
+    average_of_fitted_offers = 0.0
+    num_of_fitted_offers = 0
+    for cell_key, fitted_offers_list in fitted_offers.items():
+        for offer in fitted_offers_list:
+            t, p = offer[0], offer[1]
+            average_of_fitted_offers += p
+            num_of_fitted_offers += 1
+    average_of_fitted_offers /= num_of_fitted_offers
+    return average_of_fitted_offers

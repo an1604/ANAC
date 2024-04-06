@@ -106,7 +106,7 @@ class Offer_Map:
     def offer_count(self):
         return len(self.offer_to_idx_map)
 
-    def get_offer_from_tuple(self, offer: tuple):
+    def get_offer_from_tuple(self, offer: tuple) -> Offer:
         for _offer, idx in self.offer_to_idx_map.items():
             if offer == _offer.offer:
                 return idx, _offer
