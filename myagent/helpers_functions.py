@@ -30,7 +30,7 @@ def print_situation(situation):
         print(f'{k}: {v}\n')
 
 
-def nash_optimality(utility1, rv1, utility2, rv2):
+def nash_optimally(utility1, rv1, utility2, rv2):
     return (utility1 - rv1) * (utility2 - rv2)
 
 

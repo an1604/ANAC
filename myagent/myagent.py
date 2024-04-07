@@ -6,7 +6,7 @@ from negmas import Outcome, ResponseType, SAOState
 from negmas.preferences import nash_points, pareto_frontier
 from negmas.preferences import nash_points, pareto_frontier, winwin_level
 from detection_region import DetectionRegion
-from helpers_functions import nash_optimality, sigmoid, custom_max_offers, print_situation, \
+from helpers_functions import nash_optimally, sigmoid, custom_max_offers, print_situation, \
     calc_average_fitted_offers
 from ga import solve
 import numpy as np
@@ -442,10 +442,10 @@ class MyAgent(SAONegotiator):
             return p < self_offer.ranking_rate
 
         # Check the nash optimally value passing some THRESHOLD (out target is to maximize this value)
-        self.nash_optimality_values.append(nash_optimality(utility1=self_offer.outcome
-                                                           , rv1=self.ufun.reserved_value,
-                                                           utility2=opponent_offer.outcome,
-                                                           rv2=self.opponent_DetReg.get_estimated_rv()[1]))
+        self.nash_optimality_values.append(nash_optimally(utility1=self_offer.outcome
+                                                          , rv1=self.ufun.reserved_value,
+                                                          utility2=opponent_offer.outcome,
+                                                          rv2=self.opponent_DetReg.get_estimated_rv()[1]))
         if self.nash_optimality_values[-1] > THRESHOLD:
             return True
 
@@ -464,10 +464,29 @@ class MyAgent(SAONegotiator):
     def generate_offer(self, offer, _time, relative_time) -> Outcome:
         # If the offer is None, we generate some random nash offer to the opponent
         if offer is None:
-            return random.choice(
-                [self.self_rational_outcomes[NP[1]]
-                 for NP in self.self_Nash_equilibrium_information['nash_points']]
-            )
+            # TODO: CHECK THE ARRAYS TO SEE WHAT'S THE OUTPUT FOR EACH ONE,
+            #  AND SEE IF THERE ARE SOME ERRORS IN TRANSFERRING THE DATA TO THE GA!!
+
+            # If there is no offer, we get a list of all the nash points from the opponent,
+            # and run a genetic algorithm to generate the best offer to return.
+            nash_offers = [self.opponent_rational_outcomes[NP[1]]
+                           for NP in self.self_Nash_equilibrium_information['nash_points']]
+
+            # After we get all the nash offers, we need to create an Offer object for each.
+            nash_offers_of_objects = [
+                Offer(
+                    offer=NP,
+                    ranking_rate=self.opponent_ufun.rank_with_weights(NP)[0][0][1],
+                    lucia_rate=self.opponent_ufun(NP) / self.opponent_sum_of_utilities,
+                    outcome=self.opponent_ufun(NP),
+                    name='opponent_nash_optimally_offer'
+                )
+                for NP in nash_offers
+            ]
+
+            return solve(points=nash_offers_of_objects, self_rv=self.ufun.reserved_value,
+                         opp_rv=self.estimated_rv)
+
         else:
             self_best_offer = self.self_offers_map.sort(reverse=True)[0]
             opponent_best_offer = self.opponent_offers_map.sort(reverse=True)[0]
