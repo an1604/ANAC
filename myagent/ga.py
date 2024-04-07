@@ -2,8 +2,6 @@ import math
 import random
 from numpy import sort
 
-from myagent.helpers_functions import nash_optimally
-
 
 class SINGLE_POP:
     def __init__(self, fitness_val, points_path):
@@ -18,8 +16,11 @@ class SINGLE_POP:
 
 def dist(p1, p2, RESERVATION_VALUES):
     # Using the Nash optimally as evaluation distance function.
-    return nash_optimally(utility1=p1.outcome, utility2=p2.outcome, rv1=RESERVATION_VALUES.self_rv,
-                          rv2=RESERVATION_VALUES.opp_rv)
+    utility1 = p1.outcome
+    utility2 = p2.outcome
+    rv1 = RESERVATION_VALUES.self_rv
+    rv2 = RESERVATION_VALUES.opp_rv
+    return (utility1 - rv1) * (utility2 - rv2)
 
 
 def fitness(points, RV):

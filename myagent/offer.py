@@ -59,7 +59,8 @@ class Offer:
 class Historical_Offer:
     def __init__(self, offer, current_time, relative_time, current_round, self_outcome,
                  opponent_outcome, self_lucia_rate, opponent_lucia_rate,
-                 self_ranking_rate, opponent_ranking_rate):
+                 self_ranking_rate, opponent_ranking_rate, state):
+        self.state = state
         self.offer_string_rep = offer[0]
         self.offer = offer
         self.current_time = current_time
@@ -112,9 +113,6 @@ class Offer_Map:
                 return idx, _offer
         return None
 
-    def sort(self, reverse):
-        return sorted([offer for offer in self.offer_to_idx_map.keys()], reverse=reverse)
-
     def get_offers_as_list(self):
         return [offer for offer in self.offer_to_idx_map.keys()]
 
@@ -123,3 +121,8 @@ class Offer_Map:
 
     def get_highest(self):
         return self.sort(reverse=True)[0]
+
+    def sort(self, reverse):
+        return sorted(self.get_offers_as_list(),
+                      key=lambda offer: offer.ranking_rate,
+                      reverse=reverse)

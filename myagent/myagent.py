@@ -74,14 +74,18 @@ class MyAgent(SAONegotiator):
             for _ in self.opponent_ufun.outcome_space
             if self.opponent_ufun(_) > opponent_lower_bound_outcome
         ]
+
         self.opponent_sum_of_utilities = sum([self.opponent_ufun(_) for _ in self.opponent_rational_outcomes])
 
         self.build_agents_maps()  # First initialization of the two offer's maps for both agents
 
+        # The estimated rv and ip at the beginning are the lower and highest ranking rates offers of the opponent,
+        # from its rational outcomes
         self.estimated_rv = self.opponent_offers_map.get_lowest()
         self.estimated_ip = self.opponent_offers_map.get_highest()
 
-        self.opponent_DetReg = DetectionRegion(n_clusters=self.n_cells, deadline_time=self.deadline_time,
+        self.opponent_DetReg = DetectionRegion(n_clusters=self.n_cells,
+                                               deadline_time=self.deadline_time,
                                                initial_value=self.estimated_ip.ranking_rate,
                                                time_low_bound=0.,
                                                reserved_value=self.estimated_rv.ranking_rate,
@@ -106,14 +110,14 @@ class MyAgent(SAONegotiator):
         for self_offer in self.self_rational_outcomes:
             outcome = self.ufun(self_offer)
             ranking_rate = self.ufun.rank_with_weights(outcomes=[self_offer])[0][1]
-
-            self.self_offers_map.add_offer(Offer(
-                name=self.self_offer_name,
-                offer=self_offer,
-                ranking_rate=ranking_rate,
-                outcome=outcome,
-                lucia_rate=outcome / self.self_sum_of_utilities
-            ))
+            self.self_offers_map.add_offer(
+                Offer(
+                    name=self.self_offer_name,
+                    offer=self_offer,
+                    ranking_rate=ranking_rate,
+                    outcome=outcome,
+                    lucia_rate=outcome / self.self_sum_of_utilities
+                ))
 
         for opponent_offer in self.opponent_rational_outcomes:
             outcome = self.opponent_ufun(opponent_offer)
@@ -167,9 +171,10 @@ class MyAgent(SAONegotiator):
         if offer:
             print(f"opponent's offer: {offer}, at time: {state.time}, relative_time:{state.relative_time}")
 
-            self.update_general_information(offer=offer, relative_time=state.relative_time, _time=state.time)
+            self.update_general_information(offer=offer, relative_time=state.relative_time, _time=state.time,
+                                            state=state)
 
-            self.update_opponent_reserved_value(offer=offer, relative_time=state.relative_time, _time=state.time)
+            self.update_opponent_reserved_value(offer=offer, state=state)
 
             if self.is_accepted(offer=offer, _time=state.time, relative_time=state.relative_time):
                 print(
@@ -182,7 +187,7 @@ class MyAgent(SAONegotiator):
 
         return SAOResponse(ResponseType.REJECT_OFFER, self.ufun.best())
 
-    def update_general_information(self, relative_time, offer, _time) -> None:
+    def update_general_information(self, relative_time, offer, _time, state) -> None:
         self.rounds += 1
         self.opponent_DetReg.set_lower_bound_time(lower_bound_time=relative_time)
         self.self_DetReg.set_lower_bound_time(lower_bound_time=relative_time)
@@ -207,7 +212,8 @@ class MyAgent(SAONegotiator):
                              self_lucia_rate=self_lu_rate,
                              opponent_lucia_rate=opponent_lu_rate,
                              self_ranking_rate=self_ranking_rate,
-                             opponent_ranking_rate=opponent_ranking_rate
+                             opponent_ranking_rate=opponent_ranking_rate,
+                             state=state
                              ))
 
         if self.first_play:  # If we got the actual first offer from the opponent (and not None value).
@@ -244,8 +250,8 @@ class MyAgent(SAONegotiator):
             )
             self.opponent_offers_map.add_offer(o_offer)
 
-    def update_opponent_reserved_value(self, offer, relative_time, _time):
-        current_time = self.get_current_time(_time, relative_time)  # Choose the right time representation to take.
+    def update_opponent_reserved_value(self, offer, state):
+        current_time = self.get_current_time(state=state)  # Choose the right time representation to take.
         random_rv_from_each_cell = self.opponent_DetReg.generate_random_reservation_points()
         cells_regression_curves = self.generate_regression_curves(cells_rv=random_rv_from_each_cell,
                                                                   current_time=current_time)
@@ -258,8 +264,10 @@ class MyAgent(SAONegotiator):
         # these coefficients represent the likelihoods
         # that the reserved value of the opponent will be in cell i.
         non_linear_correlation_coefficient = self.calc_non_linear_correlation_coefficient(fitted_offers, current_time)
+
         self.opponent_DetReg.update_probabilities(non_linear_correlation_coefficient=non_linear_correlation_coefficient,
                                                   _round=self.rounds, current_time=current_time)
+
         self.estimated_rv = self.opponent_DetReg.get_estimated_rv()
         print(f"estimated_rv: {self.estimated_rv} at time {current_time}")
 
@@ -352,7 +360,7 @@ class MyAgent(SAONegotiator):
             linear_equation = cell_info['linear_equation']
             fitted_offers[cell_index] = []
             for offer in self.history:
-                x = self.get_current_time(_time=offer.current_time, relative_time=offer.relative_time)
+                x = self.get_current_time(state=offer.state)
                 y = linear_equation(x)
                 res = np.array([x, y])
                 fitted_offers[cell_index].append(res)
@@ -493,30 +501,9 @@ class MyAgent(SAONegotiator):
             return self_best_offer.offer if self_best_offer.lucia_rate > opponent_best_offer.lucia_rate else \
                 opponent_best_offer.offer
 
-    def get_current_time(self, _time, relative_time):
-        t = self._eps
-        if _time == 0.:
-            if relative_time > 0.:
-                t = relative_time
-            else:
-                if self.rounds > 0:
-                    t = self.rounds / self.deadline_time
-                else:
-                    t = self._eps
-
-        elif relative_time == 0.:
-            if _time > 0.:
-                t = _time / self.deadline_time
-            else:
-                if self.rounds > 0:
-                    t = self.rounds / self.deadline_time
-                else:
-                    t = self._eps
-
-        if t > 1.:
-            return t / self.deadline_time
-        else:
-            return t
+    @staticmethod
+    def get_current_time(state: SAOState):
+        return state.relative_time
 
     def calc_average_of_historical_offers(self, fitted_offers):
         average_of_historical_offers = 0.0

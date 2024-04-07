@@ -33,34 +33,3 @@ class Cell:
                 )
 
 
-class Probabilities:
-    def __init__(self, prior, likelihood, posterior, Y):
-        self.prior_probability = prior
-        self.likelihood_probability = likelihood
-        self.posterior_probability = posterior
-        self.can_sd = 0.05  # The standard deviation for sampling from normal distribution.
-        self.Y = self.init_probs(Y)  # Some samples
-
-    def update_prior_probability(self, new_value):
-        self.prior_probability = new_value
-
-    def get_prior_probability(self):
-        return self.prior_probability
-
-    def get_likelihood_probability(self):
-        return self.likelihood_probability
-
-    def update_posterior_probability(self, new_value):
-        self.posterior_probability = new_value
-
-    def update_likelihood_probability(self, new_value):
-        self.likelihood_probability = new_value
-
-    def get_posterior_probability(self):
-        return self.posterior_probability
-
-    def init_probs(self, Y):
-        pass
-
-    def test_for_standard_deviation(self, test_point):
-        return stats.norm(test_point, self.can_sd).pdf(1)
