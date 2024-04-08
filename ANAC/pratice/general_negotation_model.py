@@ -205,7 +205,7 @@ class GeneralNegotiationModel(SAONegotiator):
 
     def set_initial_probabilities(self):
         # We use uniform distribution for now
-        n_all = self.total_cells_as_clusters.n_clusters
+        n_all = self.total_cells_as_clusters.n_cells
         clusters_labels = self.total_cells_as_clusters.labels_
         for i, label in zip(n_all, set(clusters_labels)):
             k = f"H_{label}"
