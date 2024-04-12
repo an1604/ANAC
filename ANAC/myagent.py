@@ -13,58 +13,110 @@ class DetectingRegion:
         self.Nt = Nt  # Number of columns
         self.Np = Np  # Number of rows
         self.cells = []  # List to store detecting cells
+        self.random_reservation_points = []  # List to store random reservation points
+        self.current_time = 0  # Current negotiation time
 
         self.initialize_detecting_region()
 
     def initialize_detecting_region(self):
         # Define detecting region
-        self.detecting_region = (0, self.T, 0, 1)  # Assuming the opponent's IP and RP are in the range [0, 1]
+        self.detecting_region = (0, self.T, 0, 100)  # Initial detecting region
 
-        # Initialize detecting cells
+        # Initialize detecting cells and generate random reservation points
+        self.update_detecting_region()
+
+    def update_detecting_region(self, state: SAOState = None, max_price=100):
+        # Update the detecting region with the current negotiation time
+        # TODO: current price as min price
+        if state is not None:
+            self.current_time = state.step
+        else:
+            self.current_time = 0
+        max_price = max_price
+        if self.current_time == 0:
+            max_price = 100
+        self.detecting_region = (self.current_time, self.T, 0, max_price)
+
+        # Clear previous random reservation points and detecting cells
+        self.random_reservation_points.clear()
+        self.cells.clear()
+
+        # Initialize detecting cells and generate random reservation points
         for t_idx in range(self.Nt):
-            t_low = self.detecting_region[0] + t_idx * (self.detecting_region[1] - self.detecting_region[0]) / self.Nt
-            t_high = self.detecting_region[0] + (t_idx + 1) * (self.detecting_region[1] - self.detecting_region[0]) / self.Nt
+            t_low = (
+                self.detecting_region[0]
+                + t_idx
+                * (self.detecting_region[1] - self.detecting_region[0])
+                / self.Nt
+            )
+            t_high = (
+                self.detecting_region[0]
+                + (t_idx + 1)
+                * (self.detecting_region[1] - self.detecting_region[0])
+                / self.Nt
+            )
             for p_idx in range(self.Np):
-                p_low = self.detecting_region[2] + p_idx * (self.detecting_region[3] - self.detecting_region[2]) / self.Np
-                p_high = self.detecting_region[2] + (p_idx + 1) * (self.detecting_region[3] - self.detecting_region[2]) / self.Np
-                rv = random.uniform(p_low, p_high)  # Random reserved value in each cell
-                self.cells.append(((t_low, t_high, p_low, p_high), rv))
+                p_low = (
+                    self.detecting_region[2]
+                    + p_idx
+                    * (self.detecting_region[3] - self.detecting_region[2])
+                    / self.Np
+                )
+                p_high = (
+                    self.detecting_region[2]
+                    + (p_idx + 1)
+                    * (self.detecting_region[3] - self.detecting_region[2])
+                    / self.Np
+                )
+                tx = random.uniform(t_low, t_high)
+                px = random.uniform(p_low, p_high)
+                self.cells.append((t_low, t_high, p_low, p_high))
+                self.random_reservation_points.append((tx, px))
 
-    def get_cell_reserved_value(self, cell_idx: int) -> float:
-        return self.cells[cell_idx][1]
-    
-    def select_random_reservation_points(self):
-        for idx, ((t_low, t_high, p_low, p_high), _) in enumerate(self.cells):
-            t_x_i = random.uniform(t_low, t_high)
-            p_x_i = random.uniform(p_low, p_high)
-            self.cells[idx] = ((t_low, t_high, p_low, p_high), (t_x_i, p_x_i))
+    def print_detecting_region(self):
+        print(f"Detecting region: {self.detecting_region}")
+        for idx, cell in enumerate(self.cells):
+            print(f"Cell {idx}: {cell}")
+        for idx, point in enumerate(self.random_reservation_points):
+            print(f"Random reservation point {idx}: {point}")
 
-    def calculate_regression_lines(self, historical_offers: List[float]):
-        for idx, ((t_low, t_high, p_low, p_high), (t_x_i, p_x_i)) in enumerate(self.cells):
-            t_values = np.linspace(t_low, t_high, 10)
-            regression_values = []
-            for t_val in t_values:
-                relevant_offers = [offer for offer in historical_offers if offer[0] <= t_val]
-                if relevant_offers:
-                    t_vals = [offer[0] for offer in relevant_offers]
-                    p_vals = [offer[1] for offer in relevant_offers]
-                    t_star = np.log(t_vals / t_x_i)
-                    p_star = np.log((p_x_i - p_vals[0]) / (p_x_i - p_low))
-                    b = np.sum(t_star * p_star) / np.sum(t_star ** 2)
-                    p_star_values = p_star[0] + (p_star[0] - np.log(p_x_i)) * (t_star / np.log(t_x_i))
-                    p_values = np.exp(p_star_values)
-                    regression_values.append(np.mean(p_values))
-                else:
-                    regression_values.append(p_low)
-            self.cells[idx] = ((t_low, t_high, p_low, p_high), (t_x_i, p_x_i), t_values, regression_values)
+    def generate_regression_curve(self, history: List[float]):
+        print("Generating random regression curve")
 
-    def calculate_fitted_offers(self):
-        fitted_offers = []
-        for idx, (_, _, t_values, regression_values) in enumerate(self.cells):
-            for t_val, p_val in zip(t_values, regression_values):
-                fitted_offers.append((t_val, p_val))
-        print(fitted_offers)
-        return fitted_offers
+        # init price
+        init_price = history[0] if history[0] != 0 else 100
+
+        for reservation_point in self.random_reservation_points:
+            # claculate the beta coefficient
+            beta = 0
+            up = 0
+            down = 0
+            t_i_x, p_i_x = reservation_point[0], reservation_point[1]
+            # print(f"t_i_x: {t_i_x}")
+            # print(f"p_i_x: {p_i_x}")
+
+            for i in range(1, self.current_time):
+                history[i] = (
+                    history[i] if history[i] != init_price else init_price - 1
+                )
+                # print(f"------------i: {i}-----------")
+                # print(f"init_price: {init_price}")
+                # print(f"history[i]: {history[i]}")
+                # print(f"p_i_x: {p_i_x}")
+                p_star_i = np.log((init_price - history[i]) / (init_price - p_i_x))
+                # print(f"p_star_i: {p_star_i}")
+                t_star_i = np.log(i / t_i_x)
+                # print(f"t_star_i: {t_star_i}")
+                up += (p_star_i - p_i_x) * (t_star_i - t_i_x)
+                # print(f"up: {up}")
+                down += (t_star_i - t_i_x) ** 2
+                # print(f"down: {down}")
+
+            beta = up / down
+            print(f"beta: {beta}")
+
+        offer = init_price + (p_i_x - init_price) * (self.current_time / t_i_x) ** beta
+        print(f"regression curve offer: {offer}")
 
 
 class AwesomeNegotiator(SAONegotiator):
@@ -73,13 +125,12 @@ class AwesomeNegotiator(SAONegotiator):
     T = 0  # Deadline
     beta = 0  # Concession parameter
     detecting_region: DetectingRegion
-    N = (0,0) # (rows, columns) to divide the deterministic region into N 
-    HISTORY = [] # History of the offers made by the opponent
-    
-    
+    N = (0, 0)  # (rows, columns) to divide the deterministic region into N
+    HISTORY = []  # History of the offers made by the opponent
+    Historical_offer_points = []  # each point is a tuple of (time, utility)
+
     rational_outcomes = tuple()
     partner_reserved_value = 0
-
 
     def on_negotiation_start(self, state: GBState) -> None:
         # initialize the parameters
@@ -87,19 +138,10 @@ class AwesomeNegotiator(SAONegotiator):
         self.RP = self.reserved_value
         self.T = self.nmi.n_steps
         self.beta = 100
-        self.N = (4, 4)
+        self.N = (3, 3)
         self.HISTORY = []
-        self.detecting_region = DetectingRegion(self.T, 3, 4)  # Initialize with 3 columns and 4 rows
-        
-        # Step 1: Select random reservation points
-        self.detecting_region.select_random_reservation_points()
-
-        # Step 2: Calculate regression lines using all historical offers
-        self.detecting_region.calculate_regression_lines(self.HISTORY)
-
-        # Step 3: Calculate fitted offers
-        self.fitted_offers = self.detecting_region.calculate_fitted_offers()
-        
+        self.detecting_region = DetectingRegion(self.T, self.N[0], self.N[1])
+        # self.detecting_region.print_detecting_region()
 
     def on_preferences_changed(self, changes):
         # If there a no outcomes (should in theory never happen)
@@ -117,15 +159,22 @@ class AwesomeNegotiator(SAONegotiator):
 
     def __call__(self, state: SAOState) -> SAOResponse:
         offer = state.current_offer
-        
-        # Update the history of the offers made by the opponent
-        if offer is not None:
-            self.HISTORY.append(self.opponent_ufun(offer))        
-
-        self.update_partner_reserved_value(state)
+        # print(f"time: {state.step}")
+        # print(f"offer: {self.opponent_ufun(offer) * 100}")
 
         if self.ufun is None:
             return SAOResponse(ResponseType.END_NEGOTIATION, None)
+
+        self.HISTORY.append(self.opponent_ufun(offer) * 100)
+
+        if len(self.HISTORY) > 100:
+            self.detecting_region.update_detecting_region(
+                state, self.opponent_ufun(offer) * 100
+            )
+            # self.detecting_region.print_detecting_region()
+            self.detecting_region.generate_regression_curve(self.HISTORY)
+
+        self.update_partner_reserved_value(state)
 
         if self.acceptance_strategy(state):
             return SAOResponse(ResponseType.ACCEPT_OFFER, offer)
@@ -193,7 +242,7 @@ class AwesomeNegotiator(SAONegotiator):
     #     )
 
     # def on_round_start(self, state: SAOState) -> None:
-        # print(f"offer: {state.current_offer} with utility: {self.ufun(state.current_offer)} and opponent utility: {self.opponent_ufun(state.current_offer)}")
+    # print(f"offer: {state.current_offer} with utility: {self.ufun(state.current_offer)} and opponent utility: {self.opponent_ufun(state.current_offer)}")
 
     def isFinalRound(self, state: SAOState) -> bool:
         if state.step == self.T - 1:
