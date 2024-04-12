@@ -5,6 +5,7 @@ from negmas.outcomes import Outcome
 from negmas.sao import ResponseType, SAONegotiator, SAOResponse, SAOState
 import math
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 class DetectingRegion:
@@ -87,7 +88,7 @@ class DetectingRegion:
             print(f"Random reservation point {idx}: {point}")
 
     def generate_regression_curve(self, history: List[float]):
-        print("Generating random regression curve")
+        # print("Generating random regression curve")
         # init price
         init_price = history[0] if history[0] != 0 else 100
 
@@ -108,7 +109,7 @@ class DetectingRegion:
                 # print(f"p_i_x: {p_i_x}")
                 p_star_i = np.log((init_price - history[i]) / (init_price - p_i_x))
                 # print(f"p_star_i: {p_star_i}")
-                t_star_i = np.log(i / t_i_x)
+                t_star_i = np.log(i  / t_i_x)
                 # print(f"t_star_i: {t_star_i}")
                 t_star_i_current = np.log(self.current_time / t_i_x)
                 # print(f"t_star_i_current: {t_star_i_current}")
@@ -128,7 +129,8 @@ class DetectingRegion:
             index = 0
             offer_list = []  # List to store fitted offers
             init_price, p_i_x, t_i_x, beta = curve
-            for i in range(0, self.current_time):
+            # print(f'beta: {beta}')
+            for i in range(0, self.current_time+1):
                 offer = init_price + (p_i_x - init_price) * (i / t_i_x) ** beta
                 offer_list.append(offer)
                 # print(f"for cell: {index} at time: {i} offer: {offer}")
@@ -138,34 +140,69 @@ class DetectingRegion:
     def get_non_linear_correlation(self, history: List[float]):
         # Calculate the correlation coefficient
         index = 0
-        p_gag = np.mean(history)
+        p_gag = np.mean(np.array(history))
         for fitted_offer in self.fitted_offers:
+            if len(history) != len(fitted_offer):
+                print(f"Error: history {len(history)} and fitted_offer{len(fitted_offer)} have different lengths")
+                continue
+            
+            
             p_hat_gag = np.mean(fitted_offer)
-            up = 0
-            # print(f"p_gag: {p_gag}")
-            # print(f"p_hat_gag: {p_hat_gag}")
+            up = sum((h - p_gag) * (f - p_hat_gag) for h, f in zip(history, fitted_offer))
 
-            for i in range(len(fitted_offer)):
-                # print(f"fitted_avg: {p_hat_gag}, fitted_offer: {fitted_offer[i]}")
-                # print(f"history_avg: {p_gag}, history: {history[i]}")
-                up += ((history[i] - p_gag) * (fitted_offer[i] - p_hat_gag))
-                # print(f"up: {up}")
+            down_left = sum((h - p_gag) ** 2 for h in history)
+            down_right = sum((f - p_hat_gag) ** 2 for f in fitted_offer)
+            down = np.sqrt(down_left * down_right)
 
-            down = 0
-            down_left = 0
-            down_right = 0
-
-            for i in range(len(fitted_offer)):
-                down_left += (history[i] - p_gag) ** 2
-                down_right += (fitted_offer[i] - p_hat_gag) ** 2
-            down += np.sqrt((down_left) * (down_right))
-            # print(f"down: {down}")
-
+            if down == 0:
+                print(f"Error: down is zero")
+                continue
+            # plt.figure(figsize=(10, 6))
+            plt.scatter(np.array(fitted_offer), np.array(history))
+            
+            # plt.scatter(range(len(history)), history, label='History')
+            # plt.scatter(range(len(fitted_offer)), fitted_offer, label='Fitted Offer')
+            plt.title('Scatter plot of history and fitted_offer')
+            plt.xlabel('history')
+            plt.ylabel('fitted_offer')
+            plt.legend()
+            plt.savefig(f'plot_{index}.png',)
+            # plt.show()
+            
             gamma = up / down
-            print(f"for cell: {index} reseravtion point: {self.random_reservation_points[index]} gamma: {gamma}")
             index += 1
+            print(f"for cell: {index} reseravtion point: {self.random_reservation_points[index]} gamma: {gamma}")
             self.correlations.append(gamma)
+    # def get_non_linear_correlation(self, history: List[float]):
+    #     # Calculate the correlation coefficient
+    #     index = 0
+    #     p_gag = np.mean(history)
+    #     for fitted_offer in self.fitted_offers:
+    #         p_hat_gag = np.mean(fitted_offer)
+    #         up = 0
+    #         # print(f"p_gag: {p_gag}")
+    #         # print(f"p_hat_gag: {p_hat_gag}")
 
+    #         for i in range(len(fitted_offer)):
+    #             # print(f"fitted_avg: {p_hat_gag}, fitted_offer: {fitted_offer[i]}")
+    #             # print(f"history_avg: {p_gag}, history: {history[i]}")
+    #             up += ((history[i] - p_gag) * (fitted_offer[i] - p_hat_gag))
+    #             # print(f"up: {up}")
+
+    #         down = 0
+    #         down_left = 0
+    #         down_right = 0
+
+    #         for i in range(len(fitted_offer)):
+    #             down_left += (history[i] - p_gag) ** 2
+    #             down_right += (fitted_offer[i] - p_hat_gag) ** 2
+    #         down += np.sqrt((down_left) * (down_right))
+    #         # print(f"down: {down}")
+
+    #         gamma = up / down
+    #         # print(f"for cell: {index} reseravtion point: {self.random_reservation_points[index]} gamma: {gamma}")
+    #         index += 1
+    #         self.correlations.append(gamma)
 
 class AwesomeNegotiator(SAONegotiator):
     IP = 0  # Initial price will be set during negotiation start
@@ -304,3 +341,4 @@ if __name__ == "__main__":
     from helpers.runner import run_a_tournament
 
     run_a_tournament(AwesomeNegotiator, small=True)
+    # plt.show(block=True)
