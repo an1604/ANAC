@@ -80,7 +80,9 @@ class DetectingRegion:
                 self.random_reservation_points.append((self.T, px))
                 if self.current_time == 0:
                     self.prior_probabilities.append(1 - px / 100)
-                    print(f"Prior probability for cell {t_idx * self.Np + p_idx}: {1 - px / 100}")
+                    print(
+                        f"Prior probability for cell {t_idx * self.Np + p_idx}: {1 - px / 100}"
+                    )
                     self.posterior_probabilities.append(1 - px / 100)
 
     def print_detecting_region(self):
@@ -125,14 +127,14 @@ class DetectingRegion:
             self.fitted_offers.append(offer_list)
 
     def get_non_linear_correlation(self, history: List[float]):
+        p_gag = np.mean(history)
         for fitted_offer in self.fitted_offers:
+            p_hat_gag = np.mean(fitted_offer)
             up = 0
             down = 0
             down_left = 0
             down_right = 0
             for i in range(0, self.current_time):
-                p_gag = np.mean(history[: i + 1])
-                p_hat_gag = np.mean(fitted_offer[: i + 1])
                 left = history[i] - p_gag
                 right = fitted_offer[i] - p_hat_gag
                 up += left * right
@@ -140,7 +142,7 @@ class DetectingRegion:
                 down_right += right**2
             down = math.sqrt(down_left * down_right)
             correlation = up / down
-            if correlation < 0:
+            if correlation < 0 or np.isnan(correlation):
                 correlation = 0.1
             self.correlations.append(correlation)
 
@@ -149,16 +151,23 @@ class DetectingRegion:
         sum = 0
 
         for idx, cell in enumerate(self.cells):
-            print(f"Prior probability for cell {idx}: {self.prior_probabilities[idx]}")
-            print(f"Correlation for cell {idx}: {self.correlations[idx]}")
+            # print(f"Prior probability for cell {idx}: {self.prior_probabilities[idx]}")
+            # print(f"Correlation for cell {idx}: {self.correlations[idx]}")
             sum += self.prior_probabilities[idx] * self.correlations[idx]
+            # print(f"Sum: {sum}")
 
         for idx, cell in enumerate(self.cells):
-            print(f"Sum: {sum}")
             p = (self.prior_probabilities[idx] * self.correlations[idx]) / sum
-            # print(f"Posterior probability for cell {idx}: {p}")
+            print(
+                f"Posterior probability for reservation point {self.random_reservation_points[idx]}: {p / sum}"
+            )
             self.posterior_probabilities[idx] = p
             self.prior_probabilities[idx] = p
+
+        print(f"Max posterior probability: {max(self.posterior_probabilities)}")
+        print(
+            f"reservation point: {self.random_reservation_points[self.posterior_probabilities.index(max(self.posterior_probabilities))]}"
+        )
 
 
 class AwesomeNegotiator(SAONegotiator):
@@ -214,7 +223,7 @@ class AwesomeNegotiator(SAONegotiator):
             self.detecting_region.generate_regression_curve(self.HISTORY)
             self.detecting_region.clalculate_fitted_offers()
             self.detecting_region.get_non_linear_correlation(self.HISTORY)
-            # self.detecting_region.bayesian_update()
+            self.detecting_region.bayesian_update()
 
         self.update_partner_reserved_value(state)
 
@@ -274,10 +283,8 @@ class AwesomeNegotiator(SAONegotiator):
             if self.opponent_ufun(_) > self.partner_reserved_value
         ]
 
-    # def _on_negotiation_end(self, state: GBState) -> None:
-    #     print(
-    #         f"Final score: {self.ufun(state.agreement) - self.reserved_value * self.opponent_ufun(state.agreement)-0.2}"
-    #     )
+    def _on_negotiation_end(self, state: GBState) -> None:
+        print(f"Final score: {self.opponent_ufun(state.agreement)*100}")
 
     # def on_round_start(self, state: SAOState) -> None:
     # print(f"offer: {state.current_offer} with utility: {self.ufun(state.current_offer)} and opponent utility: {self.opponent_ufun(state.current_offer)}")
