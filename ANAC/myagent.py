@@ -18,6 +18,8 @@ class DetectingRegion:
         self.regression_curves = []  # List to store regression curves
         self.fitted_offers = []  # List to store fitted offers
         self.correlations = []  # List to store non-linear correlations
+        self.prior_probabilities = []  # List to store prior probabilities
+        self.posterior_probabilities = []  # List to store posterior probabilities
 
         self.initialize_detecting_region()
 
@@ -30,7 +32,6 @@ class DetectingRegion:
 
     def update_detecting_region(self, state: SAOState = None, max_price=100):
         # Update the detecting region with the current negotiation time
-        # TODO: current price as min price
         if state is not None:
             self.current_time = state.step
         else:
@@ -38,7 +39,7 @@ class DetectingRegion:
         max_price = max_price
         if self.current_time == 0:
             max_price = 100
-        self.detecting_region = (self.current_time, self.T, 0, max_price)
+        self.detecting_region = (self.T, self.T, 0, max_price)
 
         # Clear previous random reservation points and detecting cells
         self.random_reservation_points.clear()
@@ -74,10 +75,13 @@ class DetectingRegion:
                     * (self.detecting_region[3] - self.detecting_region[2])
                     / self.Np
                 )
-                tx = random.uniform(t_low, t_high)
                 px = random.uniform(p_low, p_high)
                 self.cells.append((t_low, t_high, p_low, p_high))
-                self.random_reservation_points.append((tx, px))
+                self.random_reservation_points.append((self.T, px))
+                if self.current_time == 0:
+                    self.prior_probabilities.append(1 - px / 100)
+                    print(f"Prior probability for cell {t_idx * self.Np + p_idx}: {1 - px / 100}")
+                    self.posterior_probabilities.append(1 - px / 100)
 
     def print_detecting_region(self):
         print(f"Detecting region: {self.detecting_region}")
@@ -87,7 +91,6 @@ class DetectingRegion:
             print(f"Random reservation point {idx}: {point}")
 
     def generate_regression_curve(self, history: List[float]):
-        print("Generating random regression curve")
         # init price
         init_price = history[0] if history[0] != 0 else 100
 
@@ -97,30 +100,16 @@ class DetectingRegion:
             up = 0
             down = 0
             t_i_x, p_i_x = reservation_point[0], reservation_point[1]
-            # print(f"t_i_x: {t_i_x}")
-            # print(f"p_i_x: {p_i_x}")
 
             for i in range(1, self.current_time):
                 history[i] = history[i] if history[i] != init_price else init_price - 1
-                # print(f"------------i: {i}-----------")
-                # print(f"init_price: {init_price}")
-                # print(f"history[i]: {history[i]}")
-                # print(f"p_i_x: {p_i_x}")
                 p_star_i = np.log((init_price - history[i]) / (init_price - p_i_x))
-                # print(f"p_star_i: {p_star_i}")
-                t_star_i = np.log(i / t_i_x)
-                # print(f"t_star_i: {t_star_i}")
-                t_star_i_current = np.log(self.current_time / t_i_x)
-                # print(f"t_star_i_current: {t_star_i_current}")
-                up += (p_star_i - p_i_x) * (t_star_i - t_i_x)
-                # print(f"up: {up}")
-                down += (t_star_i - t_i_x) ** 2
-                # print(f"down: {down}")
+                t_star_i = np.log(i / self.T)
+                up += p_star_i * t_star_i
+                down += t_star_i**2
 
             beta = up / down
             # print(f"beta: {beta}")
-            # offer = init_price + (p_i_x - init_price) * (self.current_time / t_i_x) ** beta
-            # print(f"offer: {offer}")
             self.regression_curves.append((init_price, p_i_x, t_i_x, beta))
 
     def clalculate_fitted_offers(self):
@@ -128,43 +117,48 @@ class DetectingRegion:
             index = 0
             offer_list = []  # List to store fitted offers
             init_price, p_i_x, t_i_x, beta = curve
-            for i in range(0, self.current_time):
-                offer = init_price + (p_i_x - init_price) * (i / t_i_x) ** beta
+            for i in range(0, self.current_time + 1):
+                offer = init_price + (p_i_x - init_price) * ((i / t_i_x) ** beta)
+                # print(f"offer: {offer} at time: {i}")
                 offer_list.append(offer)
-                # print(f"for cell: {index} at time: {i} offer: {offer}")
             index += 1
             self.fitted_offers.append(offer_list)
 
     def get_non_linear_correlation(self, history: List[float]):
-        # Calculate the correlation coefficient
-        index = 0
-        p_gag = np.mean(history)
         for fitted_offer in self.fitted_offers:
-            p_hat_gag = np.mean(fitted_offer)
             up = 0
-            # print(f"p_gag: {p_gag}")
-            # print(f"p_hat_gag: {p_hat_gag}")
-
-            for i in range(len(fitted_offer)):
-                # print(f"fitted_avg: {p_hat_gag}, fitted_offer: {fitted_offer[i]}")
-                # print(f"history_avg: {p_gag}, history: {history[i]}")
-                up += ((history[i] - p_gag) * (fitted_offer[i] - p_hat_gag))
-                # print(f"up: {up}")
-
             down = 0
             down_left = 0
             down_right = 0
+            for i in range(0, self.current_time):
+                p_gag = np.mean(history[: i + 1])
+                p_hat_gag = np.mean(fitted_offer[: i + 1])
+                left = history[i] - p_gag
+                right = fitted_offer[i] - p_hat_gag
+                up += left * right
+                down_left += left**2
+                down_right += right**2
+            down = math.sqrt(down_left * down_right)
+            correlation = up / down
+            if correlation < 0:
+                correlation = 0.1
+            self.correlations.append(correlation)
 
-            for i in range(len(fitted_offer)):
-                down_left += (history[i] - p_gag) ** 2
-                down_right += (fitted_offer[i] - p_hat_gag) ** 2
-            down += np.sqrt((down_left) * (down_right))
-            # print(f"down: {down}")
+    def bayesian_update(self):
+        p = 0
+        sum = 0
 
-            gamma = up / down
-            print(f"for cell: {index} reseravtion point: {self.random_reservation_points[index]} gamma: {gamma}")
-            index += 1
-            self.correlations.append(gamma)
+        for idx, cell in enumerate(self.cells):
+            print(f"Prior probability for cell {idx}: {self.prior_probabilities[idx]}")
+            print(f"Correlation for cell {idx}: {self.correlations[idx]}")
+            sum += self.prior_probabilities[idx] * self.correlations[idx]
+
+        for idx, cell in enumerate(self.cells):
+            print(f"Sum: {sum}")
+            p = (self.prior_probabilities[idx] * self.correlations[idx]) / sum
+            # print(f"Posterior probability for cell {idx}: {p}")
+            self.posterior_probabilities[idx] = p
+            self.prior_probabilities[idx] = p
 
 
 class AwesomeNegotiator(SAONegotiator):
@@ -189,7 +183,6 @@ class AwesomeNegotiator(SAONegotiator):
         self.N = (3, 3)
         self.HISTORY = []
         self.detecting_region = DetectingRegion(self.T, self.N[0], self.N[1])
-        # self.detecting_region.print_detecting_region()
 
     def on_preferences_changed(self, changes):
         # If there a no outcomes (should in theory never happen)
@@ -207,13 +200,12 @@ class AwesomeNegotiator(SAONegotiator):
 
     def __call__(self, state: SAOState) -> SAOResponse:
         offer = state.current_offer
-        # print(f"time: {state.step}")
-        # print(f"offer: {self.opponent_ufun(offer) * 100}")
 
         if self.ufun is None:
             return SAOResponse(ResponseType.END_NEGOTIATION, None)
 
-        self.HISTORY.append(self.opponent_ufun(offer) * 100)
+        if offer is not None:
+            self.HISTORY.append(self.opponent_ufun(offer) * 100)
 
         if len(self.HISTORY) > 2:
             self.detecting_region.update_detecting_region(
@@ -222,6 +214,7 @@ class AwesomeNegotiator(SAONegotiator):
             self.detecting_region.generate_regression_curve(self.HISTORY)
             self.detecting_region.clalculate_fitted_offers()
             self.detecting_region.get_non_linear_correlation(self.HISTORY)
+            # self.detecting_region.bayesian_update()
 
         self.update_partner_reserved_value(state)
 
@@ -237,11 +230,9 @@ class AwesomeNegotiator(SAONegotiator):
         offer = state.current_offer
 
         if self.isFinalRound(state):
-            # print(f"final round, accepting offer: {offer} with utility: {self.ufun(offer)}")
             return True
 
         if self.ufun(offer) >= self.ufun(self.bidding_strategy(state)):
-            # print(f"Accepting offer: {offer} with utility: {self.ufun(offer)}")
             return True
 
         return False
@@ -252,11 +243,9 @@ class AwesomeNegotiator(SAONegotiator):
         t = state.step
 
         target_offer = self.IP + (self.RP - self.IP) * (t / self.T) ** self.beta
-        # print(f"Target offer: {target_offer}")
 
         if target_offer < self.reserved_value:
             target_offer = self.reserved_value
-            # print(f"Target offer: {target_offer} is below the reserved value")
 
         closest_outcome = None
         min_distance = float("inf")
