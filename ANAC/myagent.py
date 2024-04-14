@@ -26,7 +26,7 @@ class DetectingRegion:
 
     def initialize_detecting_region(self):
         # Define detecting region
-        self.detecting_region = (0, self.T, 0, 100)  # Initial detecting region
+        self.detecting_region = (1, self.T, 0, 100)  # Initial detecting region
 
         # Initialize detecting cells and generate random reservation points
         self.update_detecting_region()
@@ -48,6 +48,8 @@ class DetectingRegion:
         self.regression_curves.clear()
         self.fitted_offers.clear()
         self.correlations.clear()
+        self.prior_probabilities.clear()
+        self.posterior_probabilities.clear()
 
         # Initialize detecting cells and generate random reservation points
         for t_idx in range(self.Nt):
@@ -79,12 +81,12 @@ class DetectingRegion:
                 px = random.uniform(p_low, p_high)
                 self.cells.append((t_low, t_high, p_low, p_high))
                 self.random_reservation_points.append((self.T, px))
-                if self.current_time == 0:
-                    self.prior_probabilities.append(1 - px / 100)
-                    # print(
-                    #     f"Prior probability for cell {t_idx * self.Np + p_idx}: {1 - px / 100}"
-                    # )
-                    self.posterior_probabilities.append(1 - px / 100)
+                # if self.current_time == 0:
+                self.prior_probabilities.append(1 / (self.Nt * self.Np))
+                # print(
+                #     f"Prior probability for cell {t_idx * self.Np + p_idx}: {1 - px / 100}"
+                # )
+                self.posterior_probabilities.append(1 / (self.Nt * self.Np))
 
     def print_detecting_region(self):
         print(f"Detecting region: {self.detecting_region}")
@@ -170,16 +172,22 @@ class DetectingRegion:
         for idx, cell in enumerate(self.cells):
             p = (self.prior_probabilities[idx] * self.correlations[idx]) / sum
             # print(
-            #     f"Posterior probability for reservation point {self.random_reservation_points[idx]}: {p / sum}"
+            # f"Posterior probability for reservation point {self.random_reservation_points[idx]}: {p / sum}"
             # )
             self.posterior_probabilities[idx] = p
             self.prior_probabilities[idx] = p
 
-        # print(f"Max posterior probability: {max(self.posterior_probabilities)}")
-        # print(
-        #     f"reservation point: {self.random_reservation_points[self.posterior_probabilities.index(max(self.posterior_probabilities))]}"
-        # )
+    def get_best_reservation_point(self):
+        best_point = self.random_reservation_points[0]
+        best_probability = self.posterior_probabilities[0]
 
+        for idx, point in enumerate(self.random_reservation_points):
+            if self.posterior_probabilities[idx] > best_probability:
+                best_probability = self.posterior_probabilities[idx]
+                best_point = point
+
+        print(f"Best reservation point: {best_point} with probability: {best_probability}")
+        return best_point
 
 class AwesomeNegotiator(SAONegotiator):
     IP = 0  # Initial price will be set during negotiation start
@@ -198,15 +206,20 @@ class AwesomeNegotiator(SAONegotiator):
 
     def on_negotiation_start(self, state: GBState) -> None:
         # initialize the parameters
-        self.IP = 100 - self.ufun(self.ufun.best()) * 100
+        self.IP = 101 - self.ufun(self.ufun.best()) * 100
         self.RP = 100 - self.reserved_value * 100
         self.T = self.nmi.n_steps
-        self.beta = 1.6
-        self.N = (3, 3)
+        self.beta = 100
+        self.N = (5, 5)
         self.HISTORY = []
         self.detecting_region = DetectingRegion(self.T, self.N[0], self.N[1])
         self.my_reserved_price = 100 - self.reserved_value * 100
-
+        print("---------------------------------------------------")
+        print(f"Initial price: {self.ufun(self.ufun.best())}")
+        print(f"Reserve price: {self.reserved_value}")
+        print("---------------------------------------------------")
+        
+    
     def on_preferences_changed(self, changes):
         # If there a no outcomes (should in theory never happen)
         if self.ufun is None:
@@ -234,10 +247,12 @@ class AwesomeNegotiator(SAONegotiator):
             self.detecting_region.update_detecting_region(
                 state, self.opponent_ufun(offer) * 100
             )
+            # self.detecting_region.print_detecting_region()
             self.detecting_region.generate_regression_curve(self.HISTORY)
             self.detecting_region.clalculate_fitted_offers()
             self.detecting_region.get_non_linear_correlation(self.HISTORY)
             self.detecting_region.bayesian_update()
+            # self.detecting_region.get_best_reservation_point()
             self.adapt_new_beta(state)
 
         self.update_partner_reserved_value(state)
@@ -254,9 +269,15 @@ class AwesomeNegotiator(SAONegotiator):
         offer = state.current_offer
 
         if self.isFinalRound(state):
+            print(
+                f"Accepting offer: {100 - self.ufun( offer)*100} with utility: {self.ufun(offer)}"
+            )
             return True
 
         if self.ufun(offer) >= self.ufun(self.bidding_strategy(state)):
+            print(
+                f"Accepting offer: {100 - self.ufun( offer)*100} with utility: {self.ufun(offer)}"
+            )
             return True
 
         return False
@@ -269,9 +290,9 @@ class AwesomeNegotiator(SAONegotiator):
         target_offer = self.IP + (self.RP - self.IP) * (t / self.T) ** self.beta
         # target_offer = 0.9 - state.step * 0.001
         # print(f"Target offer: {target_offer}")
-        
-        if target_offer < self.reserved_value:
-            target_offer = self.reserved_value
+
+        if target_offer < self.my_reserved_price:
+            target_offer = self.my_reserved_price
 
         closest_outcome = None
         min_distance = float("inf")
@@ -284,22 +305,33 @@ class AwesomeNegotiator(SAONegotiator):
                 closest_outcome = outcome
 
         self.my_current_offer = (state.step, 100 - self.ufun(closest_outcome) * 100)
-        # print(f"My current offer: {self.my_current_offer}")
         return closest_outcome
 
     def update_partner_reserved_value(self, state: SAOState) -> None:
         assert self.ufun and self.opponent_ufun
 
         offer = state.current_offer
+        best_reservation_point = self.detecting_region.get_best_reservation_point()
+        self.partner_reserved_value = best_reservation_point[1]
 
-        if self.opponent_ufun(offer) < self.partner_reserved_value:
-            self.partner_reserved_value = float(self.opponent_ufun(offer)) / 2
+        min_distance = float("inf")
+        for outcome in self.rational_outcomes:
+            outcome_price = 100 - self.ufun(outcome) * 100
+            distance = abs(outcome_price - self.partner_reserved_value)
+            if distance < min_distance:
+                min_distance = distance
+                closest_outcome = outcome
+                
+        self.partner_reserved_value = 100 - self.ufun(closest_outcome) * 100
 
-        rational_outcomes = self.rational_outcomes = [
-            _
-            for _ in self.rational_outcomes
-            if self.opponent_ufun(_) > self.partner_reserved_value
-        ]
+
+        self.partner_reserved_value = float(self.opponent_ufun(offer)) / 2
+
+        # rational_outcomes = self.rational_outcomes = [
+        #     _
+        #     for _ in self.rational_outcomes
+        #     if self.opponent_ufun(_) > self.partner_reserved_value
+        # ]
 
     # def _on_negotiation_end(self, state: GBState) -> None:
     #     print(f"Final score: {self.opponent_ufun(state.agreement)*100}")
@@ -361,7 +393,7 @@ class AwesomeNegotiator(SAONegotiator):
             self.beta = 100
             return
         overall_beta = (1 / down) - 1
-        print(f"Overall beta: {overall_beta}")
+        # print(f"Overall beta: {overall_beta}")
         self.beta = overall_beta
 
 
