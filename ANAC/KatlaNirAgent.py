@@ -104,8 +104,8 @@ class DetectingRegion:
 
             for i in range(1, self.current_time):
                 history[i] = history[i] if history[i] != init_price else init_price - 1
-                p_star_i = np.log((init_price - history[i]) / (init_price - p_i_x))
-                t_star_i = np.log(i / self.T)
+                p_star_i = math.log((init_price - history[i]) / (init_price - p_i_x))
+                t_star_i = math.log(i / self.T)
                 up += p_star_i * t_star_i
                 down += t_star_i**2
 
@@ -187,7 +187,7 @@ class DetectingRegion:
         return best_point
 
 
-class AwesomeNegotiator(SAONegotiator):
+class KatlaNirAgent(SAONegotiator):
     IP = 0  # Initial price will be set during negotiation start
     RP = 0  # Reserve price
     T = 0  # Deadline
@@ -465,8 +465,8 @@ class DetectingRegion:
 
             for i in range(1, self.current_time):
                 history[i] = history[i] if history[i] != init_price else init_price - 1
-                p_star_i = np.log((init_price - history[i]) / (init_price - p_i_x))
-                t_star_i = np.log(i / self.T)
+                p_star_i = math.log((init_price - history[i]) / (init_price - p_i_x))
+                t_star_i = math.log(i / self.T)
                 up += p_star_i * t_star_i
                 down += t_star_i**2
 
@@ -719,4 +719,4 @@ class AwesomeNegotiator(SAONegotiator):
 if __name__ == "__main__":
     from helpers.runner import run_a_tournament
 
-    run_a_tournament(AwesomeNegotiator, small=True)
+    run_a_tournament(KatlaNirAgent, small=True)
