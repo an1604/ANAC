@@ -284,7 +284,7 @@ class KatlaNirAgent(SAONegotiator):
         )
 
         if target_offer > self.my_reserved_price:
-            target_offer = self.my_reserved_price / 2
+            target_offer = self.my_reserved_price 
 
         closest_outcome = None
         target_utility = 1 - target_offer / 100
