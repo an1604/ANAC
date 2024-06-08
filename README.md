@@ -32,6 +32,3 @@ Our negotiation process unfolds through a series of meticulously crafted steps, 
 
 5. **Concession Value Determination**: Finally, we translate probabilistic insights into actionable concession strategies, dynamically adjusting our offers based on evolving negotiation dynamics. By harnessing the power of real-time learning, we ensure that our agent remains agile and responsive throughout the negotiation process, maximizing the likelihood of favorable outcomes.
 
-## Conclusion
-
-In conclusion, our refined agent strategy represents a culmination of innovative thinking, strategic foresight, and meticulous execution. By embracing a dynamic learning approach grounded in Bayesian principles, we equip our agent with the tools and insights necessary to navigate the complexities of negotiation with confidence and agility. As we embark on the ANAC 2024 competition, we remain steadfast in our commitment to excellence, poised to demonstrate the efficacy of our strategy on the global stage.
