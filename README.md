@@ -1,7 +1,5 @@
 # Agent Strategy for ANAC 2024
 
-## By: Omer Bartfeld, Eilon Alter, Aviv Nataf
-
 In preparation for this year's ANAC competition, our team embarked on a journey of meticulous planning and execution to craft an agent strategy that not only meets but exceeds the challenges posed. With an unwavering commitment to innovation and excellence, we endeavored to develop a dynamic negotiation framework that harnesses the power of real-time learning and adaptive decision-making. This strategy aims to equip our agent with the ability to discern and respond to the nuanced behaviors of its counterparts, leveraging historical insights to drive optimal concession strategies.
 
 ## Comprehensive Strategy Development
